@@ -1,3 +1,4 @@
+
 import os
 import time
 from collections import defaultdict
@@ -28,6 +29,13 @@ seguranca = HTTPBearer(auto_error=False)
 requisicoes = defaultdict(list)
 LIMITE_REQUISICOES = 10
 JANELA_SEGUNDOS = 60
+
+# Configuracao do Circuit Breaker
+FALHAS_LIMITE = 3
+TEMPO_ABERTO = 20
+
+falhas_consecutivas = 0
+circuito_aberto_ate = 0
 
 
 class Entrada(BaseModel):
@@ -101,9 +109,108 @@ def verificar_limite(request: Request):
     requisicoes[cliente] = historico
 
 
+def chamar_inferencia(caminho, dados):
+    global falhas_consecutivas, circuito_aberto_ate
+
+    agora = time.monotonic()
+
+    if agora < circuito_aberto_ate:
+        restante = int(circuito_aberto_ate - agora)
+
+        raise HTTPException(
+            status_code=503,
+            detail=f"Circuit Breaker aberto. Tente novamente em {restante + 1} segundos."
+        )
+
+    if circuito_aberto_ate:
+        print("[gateway] Circuit Breaker em teste de recuperacao")
+
+    ultimo_erro = None
+
+    # Retry: ate 3 tentativas com espera progressiva
+    for tentativa in range(3):
+        try:
+            resposta = requests.post(
+                f"{URL_INFERENCIA}{caminho}",
+                json=dados,
+                timeout=(3, 30)
+            )
+
+            if resposta.status_code >= 500:
+                resposta.raise_for_status()
+
+            if resposta.status_code >= 400:
+                raise HTTPException(
+                    status_code=resposta.status_code,
+                    detail="Erro retornado pelo servico de inferencia"
+                )
+
+            falhas_consecutivas = 0
+            circuito_aberto_ate = 0
+
+            return resposta.json()
+
+        except HTTPException:
+            raise
+
+        except requests.RequestException as erro:
+            ultimo_erro = erro
+
+            print(
+                f"[gateway] Falha na tentativa "
+                f"{tentativa + 1}/3: {erro}"
+            )
+
+            if tentativa < 2:
+                espera = 0.5 * (2 ** tentativa)
+                time.sleep(espera)
+
+    # Registra uma falha apos esgotar as tentativas
+    falhas_consecutivas += 1
+
+    print(
+        f"[gateway] Falhas consecutivas: "
+        f"{falhas_consecutivas}/{FALHAS_LIMITE}"
+    )
+
+    if falhas_consecutivas >= FALHAS_LIMITE:
+        circuito_aberto_ate = time.monotonic() + TEMPO_ABERTO
+
+        print(
+            "[gateway] Circuit Breaker ABERTO "
+            "por 20 segundos"
+        )
+
+    if isinstance(ultimo_erro, requests.Timeout):
+        raise HTTPException(
+            status_code=504,
+            detail="Tempo limite do servico de inferencia excedido"
+        )
+
+    raise HTTPException(
+        status_code=503,
+        detail="Servico de inferencia indisponivel apos 3 tentativas"
+    )
+
+
 @app.get("/saude")
 def saude():
-    return {"status": "ok", "servico": "gateway"}
+    return {
+        "status": "ok",
+        "servico": "gateway"
+    }
+
+
+@app.get("/resiliencia")
+def resiliencia():
+    aberto = time.monotonic() < circuito_aberto_ate
+
+    return {
+        "circuit_breaker": "aberto" if aberto else "fechado",
+        "falhas_consecutivas": falhas_consecutivas,
+        "limite_falhas": FALHAS_LIMITE,
+        "tempo_aberto_segundos": TEMPO_ABERTO
+    }
 
 
 @app.post("/login")
@@ -140,30 +247,27 @@ def login(credenciais: Credenciais):
 
 @app.post("/predict")
 def predict(
+    request: Request,
     entrada: Entrada,
-    usuario: dict = Depends(verificar_token),
-    request: Request = None
+    usuario: dict = Depends(verificar_token)
 ):
     verificar_limite(request)
 
-    try:
-        resposta = requests.post(
-            f"{URL_INFERENCIA}/predict",
-            json=entrada.model_dump(),
-            timeout=30
-        )
+    return chamar_inferencia(
+        "/predict",
+        entrada.model_dump()
+    )
 
-        resposta.raise_for_status()
-        return resposta.json()
 
-    except requests.Timeout:
-        raise HTTPException(
-            status_code=504,
-            detail="Tempo limite do servico de inferencia excedido"
-        )
+@app.post("/buscar")
+def buscar(
+    request: Request,
+    entrada: Entrada,
+    usuario: dict = Depends(verificar_token)
+):
+    verificar_limite(request)
 
-    except requests.RequestException:
-        raise HTTPException(
-            status_code=503,
-            detail="Servico de inferencia indisponivel"
-        )
+    return chamar_inferencia(
+        "/buscar",
+        entrada.model_dump()
+    )
