@@ -4,33 +4,33 @@ Este e o projeto integrador. Reaproveite o que voce fez em C1.A2 e C2.A2.
 
 ## Nucleo obrigatorio
 
-- [ ] **1. Autenticacao JWT no gateway** - `gateway/app.py`
+- [X] **1. Autenticacao JWT no gateway** - `gateway/app.py`
       Rota de login que emite o token e protecao das demais rotas (401 sem token). (Aula 16)
 
-- [ ] **2. Rate limit no gateway** - `gateway/app.py`
+- [X] **2. Rate limit no gateway** - `gateway/app.py`
       Limitar requisicoes por cliente por minuto. (Aula 8)
 
-- [ ] **3. Dockerfile de cada servico**
+- [X] **3. Dockerfile de cada servico**
       Um Dockerfile por servico. Use `Dockerfile.exemplo` como ponto de partida. (Aula 13)
 
-- [ ] **4. docker-compose completo**
+- [X] **4. docker-compose completo**
       O sistema inteiro deve subir com UM comando. (Aula 14)
 
-- [ ] **5. Deploy em nuvem (free tier)**
+- [X] **5. Deploy em nuvem (free tier)**
       Publicar e informar a URL publica no README. (Aula 13)
 
-- [ ] **6. Resiliencia**
+- [X] **6. Resiliencia**
       Tempo-limite, retentativa com espera progressiva e circuit breaker. (Aula 11)
 
-- [ ] **7. Observabilidade**
+- [X] **7. Observabilidade**
       Rastreamento distribuido cobrindo gateway -> fila -> worker. (Aula 15)
 
-- [ ] **8. HTTPS** no servico publicado. (Aula 16)
+- [X] **8. HTTPS** no servico publicado. (Aula 16)
 
-- [ ] **9. Secao de conformidade no README**
+- [X] **9. Secao de conformidade no README**
       Quais dados sao tratados, com qual finalidade e por quanto tempo. (LGPD, Aula 16)
 
-- [ ] **10. Relatorio de trade-offs**
+- [X] **10. Relatorio de trade-offs**
       CAP, custo e latencia do seu sistema.
 
 ## Extensoes opcionais
@@ -43,7 +43,7 @@ Este e o projeto integrador. Reaproveite o que voce fez em C1.A2 e C2.A2.
 
 ## Antes de entregar
 
-- [ ] Clone em OUTRA maquina e rode o comando unico - funciona?
-- [ ] A URL publica esta no ar?
-- [ ] Toda configuracao esta em variavel de ambiente (nada fixo no codigo)?
-- [ ] Os logs estao livres de dados pessoais?
+- [X] Clone em OUTRA maquina e rode o comando unico - funciona?
+- [X] A URL publica esta no ar?
+- [X] Toda configuracao esta em variavel de ambiente (nada fixo no codigo)?
+- [X] Os logs estao livres de dados pessoais?
