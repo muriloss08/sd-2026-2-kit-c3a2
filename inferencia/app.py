@@ -14,7 +14,33 @@ import requests
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+# OpenTelemetry
+from opentelemetry import trace, propagate
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
+
+# Configuracao do rastreamento
+recurso = Resource.create({
+    "service.name": os.getenv("OTEL_SERVICE_NAME", "inferencia")
+})
+
+provedor = TracerProvider(resource=recurso)
+exportador = OTLPSpanExporter()
+provedor.add_span_processor(BatchSpanProcessor(exportador))
+trace.set_tracer_provider(provedor)
+
+tracer = trace.get_tracer(__name__)
+
+# Aplicacao
 app = FastAPI(title="Servico de Inferencia")
+
+FastAPIInstrumentor.instrument_app(app)
+RequestsInstrumentor().instrument()
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
@@ -40,14 +66,8 @@ def gerar_vetor(texto):
     vetor = [0.0] * DIMENSAO_VETOR
 
     for palavra in palavras:
-        hash_palavra = hashlib.sha256(
-            palavra.encode("utf-8")
-        ).digest()
-
-        indice = int.from_bytes(
-            hash_palavra[:4], "big"
-        ) % DIMENSAO_VETOR
-
+        hash_palavra = hashlib.sha256(palavra.encode("utf-8")).digest()
+        indice = int.from_bytes(hash_palavra[:4], "big") % DIMENSAO_VETOR
         sinal = 1.0 if hash_palavra[4] % 2 == 0 else -1.0
         vetor[indice] += sinal
 
@@ -61,7 +81,6 @@ def gerar_vetor(texto):
 
 def preparar_qdrant():
     url = f"{QDRANT_URL}/collections/{COLECAO}"
-
     resposta = requests.get(url, timeout=5)
 
     if resposta.status_code == 404:
@@ -115,78 +134,96 @@ def saude():
 
 @app.post("/predict")
 def predict(entrada: Entrada):
-    tarefa_id = str(uuid.uuid4())
+    with tracer.start_as_current_span("inferencia.processar_tarefa") as span:
+        tarefa_id = str(uuid.uuid4())
 
-    tarefa = {
-        "id": tarefa_id,
-        "texto": entrada.texto
-    }
+        span.set_attribute("tarefa.id", tarefa_id)
+        span.set_attribute("fila.nome", "fila:inferencia")
 
-    try:
-        fila.rpush("fila:inferencia", json.dumps(tarefa))
+        # Cria a tarefa e injeta o contexto atual do rastreamento.
+        contexto_rastreio = {}
+        propagate.inject(contexto_rastreio)
 
-        limite = time.monotonic() + 25
+        tarefa = {
+            "id": tarefa_id,
+            "texto": entrada.texto,
+            "trace_context": contexto_rastreio
+        }
 
-        while time.monotonic() < limite:
-            resultado = fila.blpop(
-                f"resultado:{tarefa_id}",
-                timeout=1
-            )
+        try:
+            fila.rpush("fila:inferencia", json.dumps(tarefa))
 
-            if resultado:
-                dados = json.loads(resultado[1])
+            span.add_event("Tarefa enviada para Redis")
 
-                salvar_vetor(
-                    tarefa_id,
-                    entrada.texto,
-                    dados
+            limite = time.monotonic() + 25
+
+            while time.monotonic() < limite:
+                resultado = fila.blpop(
+                    f"resultado:{tarefa_id}",
+                    timeout=1
                 )
 
-                dados["armazenamento_vetorial"] = "Qdrant"
-                return dados
+                if resultado:
+                    dados = json.loads(resultado[1])
 
-        raise HTTPException(
-            status_code=504,
-            detail="Tempo limite aguardando o processamento"
-        )
+                    with tracer.start_as_current_span("inferencia.salvar_qdrant"):
+                        salvar_vetor(tarefa_id, entrada.texto, dados)
 
-    except redis.RedisError:
-        raise HTTPException(
-            status_code=503,
-            detail="Fila Redis indisponivel"
-        )
+                    dados["armazenamento_vetorial"] = "Qdrant"
 
-    except requests.RequestException:
-        raise HTTPException(
-            status_code=503,
-            detail="Banco vetorial Qdrant indisponivel"
-        )
+                    span.add_event("Resultado recebido do Worker")
+                    return dados
+
+            raise HTTPException(
+                status_code=504,
+                detail="Tempo limite aguardando o processamento"
+            )
+
+        except redis.RedisError as erro:
+            span.record_exception(erro)
+            raise HTTPException(
+                status_code=503,
+                detail="Fila Redis indisponivel"
+            )
+
+        except requests.RequestException as erro:
+            span.record_exception(erro)
+            raise HTTPException(
+                status_code=503,
+                detail="Banco vetorial Qdrant indisponivel"
+            )
 
 
 @app.post("/buscar")
 def buscar(entrada: Entrada):
-    try:
-        preparar_qdrant()
+    with tracer.start_as_current_span("inferencia.buscar_qdrant") as span:
+        span.set_attribute("banco.nome", "Qdrant")
 
-        resposta = requests.post(
-            f"{QDRANT_URL}/collections/{COLECAO}/points/search",
-            json={
-                "vector": gerar_vetor(entrada.texto),
-                "limit": 5,
-                "with_payload": True
-            },
-            timeout=10
-        )
+        try:
+            preparar_qdrant()
 
-        resposta.raise_for_status()
+            resposta = requests.post(
+                f"{QDRANT_URL}/collections/{COLECAO}/points/search",
+                json={
+                    "vector": gerar_vetor(entrada.texto),
+                    "limit": 5,
+                    "with_payload": True
+                },
+                timeout=10
+            )
 
-        return {
-            "consulta": entrada.texto,
-            "resultados": resposta.json()["result"]
-        }
+            resposta.raise_for_status()
 
-    except requests.RequestException:
-        raise HTTPException(
-            status_code=503,
-            detail="Nao foi possivel consultar o Qdrant"
-        )
+            span.add_event("Busca vetorial concluida")
+
+            return {
+                "consulta": entrada.texto,
+                "resultados": resposta.json()["result"]
+            }
+
+        except requests.RequestException as erro:
+            span.record_exception(erro)
+            raise HTTPException(
+                status_code=503,
+                detail="Nao foi possivel consultar o Qdrant"
+            )

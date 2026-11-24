@@ -19,15 +19,29 @@ services:
       - qdrant_storage:/qdrant/storage
     restart: unless-stopped
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+    restart: unless-stopped
+
   inferencia:
     build: ./inferencia
     environment:
       - REDIS_URL=redis://redis:6379/0
       - QDRANT_URL=http://qdrant:6333
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_SERVICE_NAME=inferencia
     depends_on:
       redis:
         condition: service_healthy
       qdrant:
+        condition: service_started
+      jaeger:
         condition: service_started
     restart: unless-stopped
 
@@ -35,9 +49,14 @@ services:
     build: ./worker
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_SERVICE_NAME=worker
     depends_on:
       redis:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     restart: unless-stopped
 
   gateway:
@@ -49,8 +68,12 @@ services:
       - JWT_SEGREDO=${JWT_SEGREDO:-troque-este-segredo}
       - LOGIN_USUARIO=${LOGIN_USUARIO:-admin}
       - LOGIN_SENHA=${LOGIN_SENHA:-admin123}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_SERVICE_NAME=gateway
     depends_on:
       - inferencia
+      - jaeger
     restart: unless-stopped
 
 volumes:

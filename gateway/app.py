@@ -10,7 +10,33 @@ from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
+# OpenTelemetry
+from opentelemetry import trace
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
+
+# Configuracao do rastreamento
+recurso = Resource.create({
+    "service.name": os.getenv("OTEL_SERVICE_NAME", "gateway")
+})
+
+provedor = TracerProvider(resource=recurso)
+exportador = OTLPSpanExporter()
+provedor.add_span_processor(BatchSpanProcessor(exportador))
+trace.set_tracer_provider(provedor)
+
+tracer = trace.get_tracer(__name__)
+
+# Aplicacao
 app = FastAPI(title="Gateway - C3.A2")
+
+FastAPIInstrumentor.instrument_app(app)
+RequestsInstrumentor().instrument()
 
 URL_INFERENCIA = os.getenv(
     "URL_INFERENCIA", "http://localhost:8001"
@@ -77,7 +103,6 @@ def verificar_token(
             JWT_SEGREDO,
             algorithms=[JWT_ALGORITMO]
         )
-
         return dados
 
     except jwt.InvalidTokenError:
@@ -112,85 +137,90 @@ def verificar_limite(request: Request):
 def chamar_inferencia(caminho, dados):
     global falhas_consecutivas, circuito_aberto_ate
 
-    agora = time.monotonic()
+    with tracer.start_as_current_span("gateway.chamar_inferencia") as span:
+        span.set_attribute("inferencia.endpoint", caminho)
 
-    if agora < circuito_aberto_ate:
-        restante = int(circuito_aberto_ate - agora)
+        agora = time.monotonic()
+
+        if agora < circuito_aberto_ate:
+            restante = int(circuito_aberto_ate - agora)
+
+            raise HTTPException(
+                status_code=503,
+                detail=f"Circuit Breaker aberto. Tente novamente em {restante + 1} segundos."
+            )
+
+        if circuito_aberto_ate:
+            print("[gateway] Circuit Breaker em teste de recuperacao")
+
+        ultimo_erro = None
+
+        # Retry: ate 3 tentativas com espera progressiva
+        for tentativa in range(3):
+            try:
+                span.set_attribute("retry.tentativa", tentativa + 1)
+
+                resposta = requests.post(
+                    f"{URL_INFERENCIA}{caminho}",
+                    json=dados,
+                    timeout=(3, 30)
+                )
+
+                if resposta.status_code >= 500:
+                    resposta.raise_for_status()
+
+                if resposta.status_code >= 400:
+                    raise HTTPException(
+                        status_code=resposta.status_code,
+                        detail="Erro retornado pelo servico de inferencia"
+                    )
+
+                falhas_consecutivas = 0
+                circuito_aberto_ate = 0
+
+                span.set_attribute("inferencia.status", resposta.status_code)
+                return resposta.json()
+
+            except HTTPException:
+                raise
+
+            except requests.RequestException as erro:
+                ultimo_erro = erro
+                span.record_exception(erro)
+
+                print(
+                    f"[gateway] Falha na tentativa "
+                    f"{tentativa + 1}/3: {erro}"
+                )
+
+                if tentativa < 2:
+                    espera = 0.5 * (2 ** tentativa)
+                    time.sleep(espera)
+
+        # Registra uma falha apos esgotar as tentativas
+        falhas_consecutivas += 1
+
+        span.set_attribute("retry.falhas_consecutivas", falhas_consecutivas)
+
+        print(
+            f"[gateway] Falhas consecutivas: "
+            f"{falhas_consecutivas}/{FALHAS_LIMITE}"
+        )
+
+        if falhas_consecutivas >= FALHAS_LIMITE:
+            circuito_aberto_ate = time.monotonic() + TEMPO_ABERTO
+            print("[gateway] Circuit Breaker ABERTO por 20 segundos")
+
+        if isinstance(ultimo_erro, requests.Timeout):
+            raise HTTPException(
+                status_code=504,
+                detail="Tempo limite do servico de inferencia excedido"
+            )
 
         raise HTTPException(
             status_code=503,
-            detail=f"Circuit Breaker aberto. Tente novamente em {restante + 1} segundos."
+            detail="Servico de inferencia indisponivel apos 3 tentativas"
         )
-
-    if circuito_aberto_ate:
-        print("[gateway] Circuit Breaker em teste de recuperacao")
-
-    ultimo_erro = None
-
-    # Retry: ate 3 tentativas com espera progressiva
-    for tentativa in range(3):
-        try:
-            resposta = requests.post(
-                f"{URL_INFERENCIA}{caminho}",
-                json=dados,
-                timeout=(3, 30)
-            )
-
-            if resposta.status_code >= 500:
-                resposta.raise_for_status()
-
-            if resposta.status_code >= 400:
-                raise HTTPException(
-                    status_code=resposta.status_code,
-                    detail="Erro retornado pelo servico de inferencia"
-                )
-
-            falhas_consecutivas = 0
-            circuito_aberto_ate = 0
-
-            return resposta.json()
-
-        except HTTPException:
-            raise
-
-        except requests.RequestException as erro:
-            ultimo_erro = erro
-
-            print(
-                f"[gateway] Falha na tentativa "
-                f"{tentativa + 1}/3: {erro}"
-            )
-
-            if tentativa < 2:
-                espera = 0.5 * (2 ** tentativa)
-                time.sleep(espera)
-
-    # Registra uma falha apos esgotar as tentativas
-    falhas_consecutivas += 1
-
-    print(
-        f"[gateway] Falhas consecutivas: "
-        f"{falhas_consecutivas}/{FALHAS_LIMITE}"
-    )
-
-    if falhas_consecutivas >= FALHAS_LIMITE:
-        circuito_aberto_ate = time.monotonic() + TEMPO_ABERTO
-
-        print(
-            "[gateway] Circuit Breaker ABERTO "
-            "por 20 segundos"
-        )
-
-    if isinstance(ultimo_erro, requests.Timeout):
-        raise HTTPException(
-            status_code=504,
-            detail="Tempo limite do servico de inferencia excedido"
-        )
-
-    raise HTTPException(
-        status_code=503,
-        detail="Servico de inferencia indisponivel apos 3 tentativas"
-    )
 
 
 @app.get("/saude")

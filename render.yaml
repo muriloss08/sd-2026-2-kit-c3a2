@@ -1,0 +1,20 @@
+
+services:
+  - type: web
+    name: sd-2026-2-gateway
+    runtime: docker
+    plan: free
+    region: ohio
+    dockerfilePath: ./gateway/Dockerfile
+    dockerContext: ./gateway
+    dockerCommand: uvicorn app:app --host 0.0.0.0 --port 10000
+    healthCheckPath: /saude
+    envVars:
+      - key: JWT_SEGREDO
+        generateValue: true
+      - key: LOGIN_USUARIO
+        value: admin
+      - key: LOGIN_SENHA
+        generateValue: true
+      - key: OTEL_SDK_DISABLED
+        value: "true"
