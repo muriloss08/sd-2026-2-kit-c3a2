@@ -484,7 +484,7 @@ O desenvolvimento e a organização do projeto são divididos entre três integr
 
 | Integrante | Frente de trabalho |
 |---|---|
-| [Inserir seu nome completo] | Gateway, autenticação, segurança, integração e publicação |
+| Murilo da Silva Soares | Gateway, autenticação, segurança, integração e publicação |
 | Rogelio Soares Reis Filho | Revisão e colaboração no serviço de Inferência, integração com Qdrant e testes |
 | Mariana Lopes | Revisão e colaboração no Worker, Redis, mensageria e observabilidade |
 
