@@ -91,7 +91,6 @@ A aplicação é composta pelos seguintes componentes:
   =====================================================
   OpenTelemetry / Jaeger  ──►  Rastreamento distribuído
   =====================================================
-
 ```
 
 O diagrama representa a arquitetura lógica da solução. Os componentes são executados em containers e se comunicam pela rede interna do Docker Compose.
@@ -120,30 +119,34 @@ O diagrama representa a arquitetura lógica da solução. Os componentes são ex
 ```text
 sd-2026-2-kit-c3a2/
 │
-├── gateway/
-│   ├── app.py
-│   ├── Dockerfile
-│   └── requirements.txt
-│
-├── inferencia/
-│   ├── app.py
-│   ├── Dockerfile
-│   └── requirements.txt
-│
-├── worker/
-│   ├── main.py
-│   ├── Dockerfile
-│   └── requirements.txt
-│
 ├── deploy/
 │   └── INSTRUCOES.md
 │
-├── docker-compose.yml
-├── render.yaml
+├── gateway/
+│   ├── Dockerfile
+│   ├── app.py
+│   └── requirements.txt
+│
+├── inferencia/
+│   ├── Dockerfile
+│   ├── README.md
+│   ├── app.py
+│   └── requirements.txt
+│
+├── worker/
+│   ├── Dockerfile
+│   ├── README.md
+│   ├── main.py
+│   └── requirements.txt
+│
 ├── .env.example
 ├── .gitignore
-└── README.md
-
+├── Dockerfile.exemplo
+├── LICENSE
+├── README.md
+├── TAREFAS.md
+├── docker-compose.yml
+└── render.yaml
 ```
 
 ---
@@ -167,9 +170,8 @@ O Docker Desktop é recomendado para usuários Windows.
 ### 7.1. Clonar o repositório
 
 ```bash
-git clone [https://github.com/muriloss08/sd-2026-2-kit-c3a2.git](https://github.com/muriloss08/sd-2026-2-kit-c3a2.git)
+git clone https://github.com/muriloss08/sd-2026-2-kit-c3a2.git
 cd sd-2026-2-kit-c3a2
-
 ```
 
 ### 7.2. Configurar as variáveis de ambiente
@@ -178,14 +180,12 @@ No Windows PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
-
 ```
 
 No Linux ou macOS:
 
 ```bash
 cp .env.example .env
-
 ```
 
 Edite o arquivo `.env` e configure valores próprios para:
@@ -194,7 +194,6 @@ Edite o arquivo `.env` e configure valores próprios para:
 JWT_SEGREDO=SUBSTITUA_POR_UMA_CHAVE_FORTE
 LOGIN_USUARIO=admin
 LOGIN_SENHA=DEFINA_UMA_SENHA_FORTE
-
 ```
 
 As demais variáveis de ambiente necessárias estão documentadas no arquivo `.env.example`.
@@ -208,7 +207,6 @@ Na pasta principal do projeto, execute:
 
 ```bash
 docker compose up --build -d
-
 ```
 
 Esse comando constrói as imagens e inicia os containers da aplicação.
@@ -217,35 +215,30 @@ Esse comando constrói as imagens e inicia os containers da aplicação.
 
 ```bash
 docker compose ps
-
 ```
 
 Para acompanhar os registros:
 
 ```bash
 docker compose logs -f
-
 ```
 
 Para acompanhar um serviço específico:
 
 ```bash
 docker compose logs -f gateway
-
 ```
 
 ### 7.5. Encerrar a aplicação
 
 ```bash
 docker compose down
-
 ```
 
 Para remover também os volumes persistentes:
 
 ```bash
 docker compose down -v
-
 ```
 
 A segunda opção remove os dados persistidos pelo volume do Qdrant. Utilize-a somente quando desejar reiniciar o armazenamento.
@@ -260,21 +253,18 @@ Endereço local:
 
 ```text
 http://localhost:8000
-
 ```
 
 Documentação Swagger:
 
 ```text
 http://localhost:8000/docs
-
 ```
 
 Verificação de saúde:
 
 ```text
 http://localhost:8000/saude
-
 ```
 
 ### Jaeger
@@ -283,7 +273,6 @@ Interface de rastreamento:
 
 ```text
 http://localhost:16686
-
 ```
 
 ### Qdrant
@@ -292,7 +281,6 @@ Interface HTTP:
 
 ```text
 http://localhost:6333
-
 ```
 
 ### Redis
@@ -301,7 +289,6 @@ Endereço interno do ambiente Docker:
 
 ```text
 redis://redis:6379/0
-
 ```
 
 A Inferência e o Worker são acessados pela rede interna do Docker Compose, não sendo necessário expor suas portas diretamente ao cliente.
@@ -338,7 +325,6 @@ O token deve ser enviado no cabeçalho:
 
 ```text
 Authorization: Bearer SEU_TOKEN
-
 ```
 
 O projeto utiliza um tempo de validade configurado para o token. A configuração atual utiliza 60 minutos.
@@ -370,7 +356,6 @@ O armazenamento é persistido por meio de um volume Docker:
 ```yaml
 volumes:
   qdrant_storage:
-
 ```
 
 Essa configuração permite manter os dados mesmo após a interrupção dos containers, desde que o volume não seja removido.
@@ -417,7 +402,6 @@ A interface do Jaeger pode ser acessada localmente:
 
 ```text
 http://localhost:16686
-
 ```
 
 Na interface, é possível selecionar os serviços disponíveis e visualizar os traces gerados pelas requisições.
