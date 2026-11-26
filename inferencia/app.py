@@ -1,4 +1,3 @@
-
 import os
 import time
 import uuid
@@ -36,17 +35,19 @@ trace.set_tracer_provider(provedor)
 
 tracer = trace.get_tracer(__name__)
 
-# Aplicacao
+# Aplicacao e instrumentacao automatica HTTP/cliente
 app = FastAPI(title="Servico de Inferencia")
 
 FastAPIInstrumentor.instrument_app(app)
 RequestsInstrumentor().instrument()
 
+# Parametros de conexao e configuracao vetorial via ambiente
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 COLECAO = "textos"
 DIMENSAO_VETOR = 16
 
+# Conexao com o Redis usada para fila de tarefas e recebimento de respostas
 fila = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 
@@ -56,6 +57,7 @@ class Entrada(BaseModel):
 
 def gerar_vetor(texto):
     """Gera uma representacao numerica demonstrativa do texto."""
+    # Normaliza acentos e caixa antes de extrair os termos
     texto = unicodedata.normalize("NFKD", texto.lower())
     texto = "".join(
         caractere for caractere in texto
@@ -65,12 +67,14 @@ def gerar_vetor(texto):
     palavras = re.findall(r"\w+", texto)
     vetor = [0.0] * DIMENSAO_VETOR
 
+    # Mapeia cada palavra para um indice e sinal via hash SHA-256
     for palavra in palavras:
         hash_palavra = hashlib.sha256(palavra.encode("utf-8")).digest()
         indice = int.from_bytes(hash_palavra[:4], "big") % DIMENSAO_VETOR
         sinal = 1.0 if hash_palavra[4] % 2 == 0 else -1.0
         vetor[indice] += sinal
 
+    # Normaliza o vetor pela norma euclidiana quando nao for nulo
     norma = math.sqrt(sum(valor * valor for valor in vetor))
 
     if norma > 0:
@@ -80,6 +84,7 @@ def gerar_vetor(texto):
 
 
 def preparar_qdrant():
+    # Garante que a colecao exista no Qdrant antes de ler ou gravar pontos
     url = f"{QDRANT_URL}/collections/{COLECAO}"
     resposta = requests.get(url, timeout=5)
 
@@ -100,6 +105,7 @@ def preparar_qdrant():
 
 
 def salvar_vetor(tarefa_id, texto, resultado):
+    # Persiste o vetor e os metadados da tarefa no Qdrant
     preparar_qdrant()
 
     resposta = requests.put(
@@ -126,6 +132,7 @@ def salvar_vetor(tarefa_id, texto, resultado):
 
 @app.get("/saude")
 def saude():
+    # Endpoint simples de verificacao de saude do servico
     return {
         "status": "ok",
         "servico": "inferencia"
@@ -134,6 +141,7 @@ def saude():
 
 @app.post("/predict")
 def predict(entrada: Entrada):
+    # Abre o span principal de processamento da tarefa na inferencia
     with tracer.start_as_current_span("inferencia.processar_tarefa") as span:
         tarefa_id = str(uuid.uuid4())
 
@@ -151,10 +159,12 @@ def predict(entrada: Entrada):
         }
 
         try:
+            # Enfileira a tarefa para consumo assincrono pelo worker
             fila.rpush("fila:inferencia", json.dumps(tarefa))
 
             span.add_event("Tarefa enviada para Redis")
 
+            # Aguarda o resultado da tarefa ate o limite de 25 segundos
             limite = time.monotonic() + 25
 
             while time.monotonic() < limite:
@@ -166,6 +176,7 @@ def predict(entrada: Entrada):
                 if resultado:
                     dados = json.loads(resultado[1])
 
+                    # Registra o armazenamento vetorial em um sub-span proprio
                     with tracer.start_as_current_span("inferencia.salvar_qdrant"):
                         salvar_vetor(tarefa_id, entrada.texto, dados)
 
@@ -196,6 +207,7 @@ def predict(entrada: Entrada):
 
 @app.post("/buscar")
 def buscar(entrada: Entrada):
+    # Consulta textos similares no Qdrant a partir do vetor da consulta
     with tracer.start_as_current_span("inferencia.buscar_qdrant") as span:
         span.set_attribute("banco.nome", "Qdrant")
 
