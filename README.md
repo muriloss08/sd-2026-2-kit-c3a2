@@ -1,10 +1,12 @@
 # Plataforma de IA como Serviço — C3.A2
 
-**Disciplina:** Sistemas Distribuídos e Computação em Nuvem  
-**Instituição:** FAESA  
-**Período:** 2026/2  
-**Professor:** Howard Cruz Roatti  
-**Entrega:** 26/11/2026
+| Campo | Informação |
+|---|---|
+| **Disciplina** | Sistemas Distribuídos e Computação em Nuvem |
+| **Instituição** | FAESA |
+| **Período** | 2026/2 |
+| **Professor** | Howard Cruz Roatti |
+| **Entrega** | 26/11/2026 |
 
 ---
 
@@ -15,6 +17,8 @@ Este projeto tem como objetivo desenvolver uma Plataforma de IA como Serviço ut
 A solução foi construída com serviços independentes responsáveis pela autenticação, processamento de solicitações, execução assíncrona de tarefas, armazenamento vetorial e monitoramento da comunicação entre componentes.
 
 O projeto demonstra a aplicação prática de conceitos de sistemas distribuídos e computação em nuvem, incluindo conteinerização, comunicação entre serviços, mensageria, segurança, resiliência e observabilidade.
+
+---
 
 ## 2. Objetivos do projeto
 
@@ -27,6 +31,8 @@ O projeto demonstra a aplicação prática de conceitos de sistemas distribuído
 - Monitorar a comunicação entre serviços utilizando OpenTelemetry e Jaeger.
 - Conteinerizar os componentes utilizando Docker.
 - Disponibilizar um serviço publicamente por meio de uma plataforma de nuvem.
+
+---
 
 ## 3. Arquitetura da solução
 
@@ -55,41 +61,47 @@ A aplicação é composta pelos seguintes componentes:
 ### Diagrama lógico
 
 ```text
-                 CLIENTE
-                    |
-                    v
-             +-------------+
-             | API GATEWAY |
-             | JWT / REST  |
-             +-------------+
-                    |
-                    v
-             +-------------+
-             | INFERÊNCIA  |
-             +-------------+
-                    |
-             +------+------+
-             |             |
-             v             v
-         +-------+     +---------+
-         | REDIS |     | QDRANT  |
-         +-------+     +---------+
+                    +-------------+
+                    |   CLIENTE   |
+                    +------+------+
+                           |
+                           v
+                    +-------------+
+                    | API GATEWAY |
+                    | JWT / REST  |
+                    +------+------+
+                           |
+                           v
+                    +-------------+
+                    | INFERÊNCIA  |
+                    +------+------+
+                           |
+             +-------------+-------------+
+             |                           |
+             v                           v
+      +-------------+             +-------------+
+      |    REDIS    |             |   QDRANT    |
+      +------+------+             +-------------+
              |
              v
-         +--------+
-         | WORKER |
-         +--------+
+      +-------------+
+      |   WORKER    |
+      +-------------+
 
-     OpenTelemetry / Jaeger
-     Rastreamento distribuído
+  =====================================================
+  OpenTelemetry / Jaeger  ──►  Rastreamento distribuído
+  =====================================================
+
 ```
 
 O diagrama representa a arquitetura lógica da solução. Os componentes são executados em containers e se comunicam pela rede interna do Docker Compose.
 
+---
+
 ## 4. Tecnologias utilizadas
 
 | Tecnologia | Aplicação |
-|---|---|
+| --- | --- |
 | Python 3.12 | Desenvolvimento dos serviços |
 | FastAPI | Construção das APIs |
 | Docker | Conteinerização |
@@ -100,6 +112,8 @@ O diagrama representa a arquitetura lógica da solução. Os componentes são ex
 | Jaeger | Visualização de traces |
 | JWT | Autenticação |
 | Render | Publicação do Gateway |
+
+---
 
 ## 5. Estrutura do repositório
 
@@ -129,27 +143,33 @@ sd-2026-2-kit-c3a2/
 ├── .env.example
 ├── .gitignore
 └── README.md
+
 ```
+
+---
 
 ## 6. Requisitos para execução
 
 Para executar o projeto localmente, são necessários:
 
-- Windows, Linux ou macOS.
-- Docker instalado.
-- Docker Compose.
-- Git.
-- Conexão com a internet para baixar as imagens e dependências na primeira execução.
+* Windows, Linux ou macOS.
+* Docker instalado.
+* Docker Compose.
+* Git.
+* Conexão com a internet para baixar as imagens e dependências na primeira execução.
 
 O Docker Desktop é recomendado para usuários Windows.
+
+---
 
 ## 7. Instalação e execução
 
 ### 7.1. Clonar o repositório
 
 ```bash
-git clone https://github.com/muriloss08/sd-2026-2-kit-c3a2.git
+git clone [https://github.com/muriloss08/sd-2026-2-kit-c3a2.git](https://github.com/muriloss08/sd-2026-2-kit-c3a2.git)
 cd sd-2026-2-kit-c3a2
+
 ```
 
 ### 7.2. Configurar as variáveis de ambiente
@@ -158,12 +178,14 @@ No Windows PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
+
 ```
 
 No Linux ou macOS:
 
 ```bash
 cp .env.example .env
+
 ```
 
 Edite o arquivo `.env` e configure valores próprios para:
@@ -172,11 +194,13 @@ Edite o arquivo `.env` e configure valores próprios para:
 JWT_SEGREDO=SUBSTITUA_POR_UMA_CHAVE_FORTE
 LOGIN_USUARIO=admin
 LOGIN_SENHA=DEFINA_UMA_SENHA_FORTE
+
 ```
 
 As demais variáveis de ambiente necessárias estão documentadas no arquivo `.env.example`.
 
-**Importante:** nunca envie o arquivo `.env` ao GitHub. O repositório utiliza `.gitignore` para impedir o versionamento das credenciais locais.
+> [!IMPORTANT]
+> nunca envie o arquivo `.env` ao GitHub. O repositório utiliza `.gitignore` para impedir o versionamento das credenciais locais.
 
 ### 7.3. Iniciar todos os serviços
 
@@ -184,6 +208,7 @@ Na pasta principal do projeto, execute:
 
 ```bash
 docker compose up --build -d
+
 ```
 
 Esse comando constrói as imagens e inicia os containers da aplicação.
@@ -192,33 +217,40 @@ Esse comando constrói as imagens e inicia os containers da aplicação.
 
 ```bash
 docker compose ps
+
 ```
 
 Para acompanhar os registros:
 
 ```bash
 docker compose logs -f
+
 ```
 
 Para acompanhar um serviço específico:
 
 ```bash
 docker compose logs -f gateway
+
 ```
 
 ### 7.5. Encerrar a aplicação
 
 ```bash
 docker compose down
+
 ```
 
 Para remover também os volumes persistentes:
 
 ```bash
 docker compose down -v
+
 ```
 
 A segunda opção remove os dados persistidos pelo volume do Qdrant. Utilize-a somente quando desejar reiniciar o armazenamento.
+
+---
 
 ## 8. Endpoints e interfaces
 
@@ -228,18 +260,21 @@ Endereço local:
 
 ```text
 http://localhost:8000
+
 ```
 
 Documentação Swagger:
 
 ```text
 http://localhost:8000/docs
+
 ```
 
 Verificação de saúde:
 
 ```text
 http://localhost:8000/saude
+
 ```
 
 ### Jaeger
@@ -248,6 +283,7 @@ Interface de rastreamento:
 
 ```text
 http://localhost:16686
+
 ```
 
 ### Qdrant
@@ -256,6 +292,7 @@ Interface HTTP:
 
 ```text
 http://localhost:6333
+
 ```
 
 ### Redis
@@ -264,16 +301,19 @@ Endereço interno do ambiente Docker:
 
 ```text
 redis://redis:6379/0
+
 ```
 
 A Inferência e o Worker são acessados pela rede interna do Docker Compose, não sendo necessário expor suas portas diretamente ao cliente.
+
+---
 
 ## 9. API e autenticação
 
 O API Gateway disponibiliza os seguintes endpoints:
 
 | Método | Endpoint | Finalidade |
-|---|---|---|
+| --- | --- | --- |
 | GET | `/saude` | Verificação de saúde do Gateway |
 | GET | `/resiliencia` | Consulta do estado do Circuit Breaker |
 | POST | `/login` | Autenticação e geração de JWT |
@@ -298,6 +338,7 @@ O token deve ser enviado no cabeçalho:
 
 ```text
 Authorization: Bearer SEU_TOKEN
+
 ```
 
 O projeto utiliza um tempo de validade configurado para o token. A configuração atual utiliza 60 minutos.
@@ -306,6 +347,8 @@ O projeto utiliza um tempo de validade configurado para o token. A configuraçã
 
 O Gateway possui limitação de requisições por endereço IP, reduzindo o risco de excesso de chamadas em um curto intervalo.
 
+---
+
 ## 10. Mensageria e processamento assíncrono
 
 O Redis é utilizado como mecanismo de fila para desacoplar a recepção das solicitações da execução do processamento.
@@ -313,6 +356,8 @@ O Redis é utilizado como mecanismo de fila para desacoplar a recepção das sol
 A Inferência registra as tarefas, enquanto o Worker consome os itens da fila e executa o processamento.
 
 Essa separação permite distribuir responsabilidades entre serviços independentes e facilita a evolução da arquitetura.
+
+---
 
 ## 11. Armazenamento vetorial
 
@@ -325,11 +370,14 @@ O armazenamento é persistido por meio de um volume Docker:
 ```yaml
 volumes:
   qdrant_storage:
+
 ```
 
 Essa configuração permite manter os dados mesmo após a interrupção dos containers, desde que o volume não seja removido.
 
 As representações utilizadas no projeto têm finalidade demonstrativa e não representam necessariamente embeddings produzidos por um modelo de linguagem avançado.
+
+---
 
 ## 12. Resiliência e tolerância a falhas
 
@@ -351,15 +399,17 @@ Após o período de espera, o mecanismo permite novas tentativas para verificar 
 
 Esses recursos ajudam a evitar chamadas repetidas a serviços indisponíveis e melhoram o comportamento da aplicação diante de falhas.
 
+---
+
 ## 13. Observabilidade e rastreamento distribuído
 
 O projeto utiliza OpenTelemetry para instrumentar os serviços e Jaeger para visualizar os rastreamentos distribuídos.
 
 A instrumentação permite acompanhar a comunicação entre:
 
-- Gateway.
-- Inferência.
-- Worker.
+* Gateway.
+* Inferência.
+* Worker.
 
 O contexto de rastreamento é propagado durante o processamento das tarefas, permitindo relacionar operações executadas em diferentes serviços.
 
@@ -367,37 +417,34 @@ A interface do Jaeger pode ser acessada localmente:
 
 ```text
 http://localhost:16686
+
 ```
 
 Na interface, é possível selecionar os serviços disponíveis e visualizar os traces gerados pelas requisições.
+
+---
 
 ## 14. Segurança
 
 Os principais recursos de segurança implementados são:
 
-- Autenticação por JWT.
-- Proteção das rotas que exigem autenticação.
-- Armazenamento de credenciais em variáveis de ambiente.
-- Rate Limit no Gateway.
-- Comunicação HTTPS no Gateway publicado no Render.
+* Autenticação por JWT.
+* Proteção das rotas que exigem autenticação.
+* Armazenamento de credenciais em variáveis de ambiente.
+* Rate Limit no Gateway.
+* Comunicação HTTPS no Gateway publicado no Render.
 
 As credenciais reais não devem ser armazenadas no código-fonte nem compartilhadas publicamente.
+
+---
 
 ## 15. Publicação em nuvem
 
 O API Gateway foi publicado utilizando o plano gratuito do Render.
 
-**URL pública:**
-
-https://sd-2026-2-gateway.onrender.com
-
-**Documentação Swagger:**
-
-https://sd-2026-2-gateway.onrender.com/docs
-
-**Verificação de saúde:**
-
-https://sd-2026-2-gateway.onrender.com/saude
+* **URL pública:** `https://sd-2026-2-gateway.onrender.com`
+* **Documentação Swagger:** `https://sd-2026-2-gateway.onrender.com/docs`
+* **Verificação de saúde:** `https://sd-2026-2-gateway.onrender.com/saude`
 
 A plataforma Render disponibiliza HTTPS para o serviço publicado.
 
@@ -411,36 +458,41 @@ Por isso, as funcionalidades que dependem da comunicação entre o Gateway publi
 
 O plano gratuito do Render também pode suspender o serviço após um período de inatividade, causando demora na primeira requisição posterior.
 
+---
+
 ## 16. LGPD e tratamento de dados
 
 A aplicação pode processar textos enviados pelos usuários, além de informações técnicas necessárias à autenticação e ao funcionamento dos serviços.
 
 ### Dados tratados
 
-- Textos enviados para processamento.
-- Representações vetoriais geradas a partir dos textos.
-- Identificadores de tarefas.
-- Informações técnicas de rastreamento e execução.
-- Informações utilizadas na autenticação.
+* Textos enviados para processamento.
+* Representações vetoriais geradas a partir dos textos.
+* Identificadores de tarefas.
+* Informações técnicas de rastreamento e execução.
+* Informações utilizadas na autenticação.
 
 ### Finalidade
 
 Os dados são utilizados exclusivamente para:
 
-- Processar solicitações de inferência.
-- Armazenar e recuperar representações vetoriais.
-- Executar tarefas assíncronas.
-- Controlar o acesso à API.
-- Monitorar o funcionamento da aplicação.
+* Processar solicitações de inferência.
+* Armazenar e recuperar representações vetoriais.
+* Executar tarefas assíncronas.
+* Controlar o acesso à API.
+* Monitorar o funcionamento da aplicação.
 
 ### Retenção
 
-- Os dados vetoriais permanecem no volume persistente do Qdrant até sua remoção.
-- Não foi configurada uma política automática de expiração dos dados vetoriais.
-- Os dados armazenados no Redis dependem do ciclo de vida e das configurações do serviço.
-- Os registros de rastreamento dependem da configuração de armazenamento do Jaeger.
+* Os dados vetoriais permanecem no volume persistente do Qdrant até sua remoção.
+* Não foi configurada uma política automática de expiração dos dados vetoriais.
+* Os dados armazenados no Redis dependem do ciclo de vida e das configurações do serviço.
+* Os registros de rastreamento dependem da configuração de armazenamento do Jaeger.
 
-Recomenda-se utilizar somente dados fictícios ou de teste durante as demonstrações, evitando o envio de dados pessoais reais.
+> [!NOTE]
+> Recomenda-se utilizar somente dados fictícios ou de teste durante as demonstrações, evitando o envio de dados pessoais reais.
+
+---
 
 ## 17. Relatório de trade-offs
 
@@ -478,23 +530,29 @@ Os mecanismos de timeout e retry ajudam a controlar falhas, mas novas tentativas
 
 Na implantação pública, o tempo de resposta também pode ser afetado pela suspensão do serviço gratuito do Render.
 
+---
+
 ## 18. Equipe e divisão de responsabilidades
 
 O desenvolvimento e a organização do projeto são divididos entre três integrantes.
 
 | Integrante | Frente de trabalho |
-|---|---|
+| --- | --- |
 | Murilo da Silva Soares | Gateway, autenticação, segurança, integração e publicação |
 | Rogelio Soares Reis Filho | Revisão e colaboração no serviço de Inferência, integração com Qdrant e testes |
 | Mariana Lopes | Revisão e colaboração no Worker, Redis, mensageria e observabilidade |
 
 A divisão representa as frentes de colaboração planejadas para a equipe. As contribuições individuais devem ser registradas no histórico do GitHub conforme forem realizadas.
 
+---
+
 ## 19. Repositório
 
 GitHub:
 
-https://github.com/muriloss08/sd-2026-2-kit-c3a2
+`https://github.com/muriloss08/sd-2026-2-kit-c3a2`
+
+---
 
 ## 20. Considerações finais
 
@@ -505,3 +563,7 @@ A solução reúne autenticação, comunicação assíncrona, armazenamento veto
 O Docker Compose permite executar os componentes da arquitetura localmente por meio de um único comando, enquanto a publicação do Gateway demonstra a disponibilização de uma API pública utilizando HTTPS.
 
 O desenvolvimento prioriza a separação de responsabilidades, a comunicação entre serviços e a execução reproduzível da aplicação.
+
+```
+
+```
