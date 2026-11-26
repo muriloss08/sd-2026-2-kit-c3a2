@@ -563,7 +563,3 @@ A solução reúne autenticação, comunicação assíncrona, armazenamento veto
 O Docker Compose permite executar os componentes da arquitetura localmente por meio de um único comando, enquanto a publicação do Gateway demonstra a disponibilização de uma API pública utilizando HTTPS.
 
 O desenvolvimento prioriza a separação de responsabilidades, a comunicação entre serviços e a execução reproduzível da aplicação.
-
-```
-
-```
